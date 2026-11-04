@@ -220,9 +220,30 @@ ret
 # Counts the eight living cells surrounding one visible cell.
 # The invisible border makes all eight byte addresses valid.
 # ---------------------------------------------------------
+# call a0 as current cell address and then we count| top left(-13) | top middle(-12) | top right(-11)
+#                                                  | left(-1)      | current(a0)     | right(1)
+#                                                  | bot left(11)  | bot mid(12)     | bot right(13)
+# Then add the value so add a1, a1, t0 so add 0 + 1 or 0 and repeat
 count_neighbors:
-
-ret
+li a1, 0
+lbu t0, -13(a0)
+add a1, a1, t0
+lbu t0, -12(a0)
+add a1, a1, t0
+lbu t0, -11(a0)
+add a1, a1, t0
+lbu t0, -1(a0)
+add a1, a1, t0
+lbu t0, 1(a0)
+add a1, a1, t0
+lbu t0, 11(a0)
+add a1, a1, t0
+lbu t0, 12(a0)
+add a1, a1, t0
+lbu t0, 13(a0)
+add a1, a1, t0
+mv a0, a1
+ret #returns the number of living cells surround the given cell in a0
 
 # ---------------------------------------------------------
 # calculate_generation
