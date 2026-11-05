@@ -6,6 +6,9 @@
 .data
 test_pattern:
     .asciz "232425323334666768757677"
+    
+main_board: .space 144 # Stores the current gen
+next_board: .space 144 # Stores the next gen
 
 title_prompt: .asciz "RISC-V Colony\n"
 loadTest_prompt: .asciz  "1. Load the test pattern.\n"
@@ -167,8 +170,22 @@ ret
 # Sets all 144 byte locations in one 12 x 12 board to zero.
 # ---------------------------------------------------------
 clear_board:
+	# Take the memory address of main_board or next
+	mv t0, a0
+	# Counter until there are no more bytes remaining
+	li t1, 144
 
-ret
+clear_loop:
+	# Stores zero into the first memory address
+	sb zero, 0(t0)
+	# Advance the memory addreess by one byte
+	addi t0, t0, 1
+	# Update the counter
+	addi t1, t1, -1
+	# Loops until it reaches 0
+	bnez t1, clear_loop
+
+	ret
 
 # ---------------------------------------------------------
 # load_test_pattern
