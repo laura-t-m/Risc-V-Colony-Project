@@ -268,8 +268,68 @@ ret #returns the number of living cells surround the given cell in a0
 # loops, calls count_neighbors, and writes the complete next state.
 # ---------------------------------------------------------
 calculate_generation:
+#save on stack 32 bytes and then save s0-s4 and ra
+addi sp, sp, -32
+sw s0, 0(sp)
+sw s1, 4(sp)
+sw ra, 8(sp)
+sw s2, 12(sp)
+sw s3, 16(sp)
+sw s4, 20(sp)
 
+mv s0, a0
+mv s1, a1
+li s2, 1
+
+outer_loop:
+li s3, 1
+
+inner_loop:
+#load t1 with 12 for offset calculation of row x 12 + columns
+li t1, 12
+mul s4, s2, t1
+add s4, s4, s3
+
+# add the base adress + offset into a0
+add a0, s0, s4
+call count_neighbors
+add t1, s0, s4
+lbu t2, 0(t1)
+
+li t3, 3
+beq a0, t3, cell_alive
+li t4, 2
+beq a0, t4, keep_cell_state
+#load t2 with value 0 for dead cell and then Jump to shared_board_storage to load value to next board
+li t2, 0
+j shared_board_storage 
+
+cell_alive:
+li t2, 1
+j shared_board_storage
+
+keep_cell_state:
+j shared_board_storage
+
+shared_board_storage:
+add t1, s1, s4
+sb t2, 0(t1)
+addi s3, s3, 1
+li t5, 11
+blt s3, t5, inner_loop
+addi s2, s2, 1
+blt s2, t5, outer_loop
+
+#load those values back into the registers
+lw s0, 0(sp)
+lw s1, 4(sp)
+lw ra, 8(sp)
+lw s2, 12(sp)
+lw s3, 16(sp)
+lw s4, 20(sp)
+addi sp, sp, 32
 ret
+
 
 # ---------------------------------------------------------
 # count_population
