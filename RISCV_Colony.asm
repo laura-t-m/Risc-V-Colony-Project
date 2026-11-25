@@ -4,12 +4,13 @@
 .eqv BOARD_BYTES 144
 .eqv CELLS_TO_PLACE 12
 
+
 .data
 test_pattern:
     .asciz "232425323334666768757677"
      
-main_board: .space BOARD_BYTES  # Stores the current gen (reserve space for 144 bytes)
-next_board: .space BOARD_BYTES # Stores the next gen
+board_a: .space BOARD_BYTES  # stores 144 bytes for board_a
+board_b: .space BOARD_BYTES # stores 144 bytes for board_b
 
 #Menu promps
 title_prompt: .asciz "RISC-V Colony\n"
@@ -23,7 +24,21 @@ quit_prompt: .asciz "0. Quit\n"
 invalid_prompt: .asciz "Invalid selection, try again.\n"
 selection_prompt: .asciz "Selection: "
 
+#Statistics 
+generationNumber: .asciz "Generation: "
+currentPopulation: .asciz "Population: "
+largestPopulation: .asciz "Largest Population: "
+generationsCompleted: .asciz "Generations Completed: "
+currentScore: .asciz "Score: "
+colonyStatus: .asciz "Colony Status: " #alive or extinct
 
+#Cell Coordinate Request Promps
+cell: .asciz "Cell "
+of_12: .asciz " of 12\n"
+row_prompt: .asciz "Row (0-9): "
+column_prompt: .asciz "Column (0-9): "
+invalid_coordinate_msg: .asciz "Row or Column Range Invalid. Try again\n"
+invalid_occupied_msg: .asciz "Position Choosen is Already Occupied. Try again\n"
 .text
 .globl main
 
@@ -44,7 +59,7 @@ selection_prompt: .asciz "Selection: "
 #     none
 # ---------------------------------------------------------
 main:
-    call reset_colony
+    call clear_board #clear board/clear colony 
 
 menu_loop:
 
@@ -110,6 +125,7 @@ loadTest:
     bne t0, a0, createColony    #compare prompt value with selection value - If !=, branch to next menu option & repeat
     
     call load_test_pattern      #if =, call routine
+       
     j menu_loop                 #Jump back to menu loop -> Display menu again
  
 createColony:
@@ -138,6 +154,7 @@ clearBoard:
    bne t0, a0, displayStatistics
    
    call clear_board
+     
    j menu_loop
  
 displayStatistics:
@@ -161,69 +178,77 @@ invalid:
    j menu_loop
 
 # ---------------------------------------------------------
-# reset_colony
+# reset_colony #NOT NEEDED (?) Instead use just Clear Board
 # Clears both boards, selects board_a as current, selects board_b
 # as next, and resets all statistics.
 #
-# Arguments:
+# Arguments: 
 #
 #
-# Returns:
+# Returns: 
 #
 #
-# Modifies:
+# Modifies: 
 #
 #
 # ---------------------------------------------------------
 reset_colony:
 
-#call clear board on board_a
-#call clear board on board_b
 
-#select board_a as current
-
-#select board_b as next
-
-#reset statistics
-
-#return
 ret
+
 # ---------------------------------------------------------
 # clear_board
-# Sets all 144 byte locations in one 12 x 12 board to zero.
+# Clears both boards (Sets all 144 byte locations in one 12 x 12 board to zero)
+# selects board_a as current, selects board_b as next
+# resets all statistics.
 #
-# Arguments:
+# Arguments:  none
 #
 #
-# Returns:
+# Returns: a0 (Current Board/Board_a), a1 (Next Board/Board_b)
 #
 #
-# Modifies:
+# Modifies: a0-a1 , t0
 #
 #
 # ---------------------------------------------------------
 clear_board:
-	# Take the memory address of main_board or next
-	mv t0, a0
+	# Take the memory address of  board_a and board_b
+	la a0, board_a
+	la a1, board_b
+	
 	# Counter until there are no more bytes remaining
-	li t1, 144
-
-clear_loop:
+	li t0, 144
+       
+clear_boards_loop:
+        
 	# Stores zero into the first memory address
-	sb zero, 0(t0)
+	sb zero, 0(a0)
+	sb zero,0(a1)
+	
 	# Advance the memory addreess by one byte
-	addi t0, t0, 1
+	addi a0, a0, 1
+	addi a1, a1, 1
+	
 	# Update the counter
-	addi t1, t1, -1
+	addi t0, t0, -1
 	# Loops until it reaches 0
-	bnez t1, clear_loop
+	bnez t0, clear_boards_loop
 
+clear_statistics:
+# resets all statistics
+
+clear_done:
+# selects board_a as current, selects board_b as next
+     
+        
 	ret
 
 # ---------------------------------------------------------
 # load_test_pattern
 # Clears the colony, decodes twelve row-column digit pairs from
-# test_pattern, places them on board_a, and initializes population.
+# test_pattern, places them on board_a to create colony, and initializes population.
 #
 # Arguments: 
 #	none
@@ -236,18 +261,21 @@ clear_loop:
 #
 # ---------------------------------------------------------
 load_test_pattern:
+#Expand stack, store registers
+addi sp, sp, -16
+sw ra, 12(sp)
 
-#clears colony - calls reset colony  on board a and b
+#clears colony/board: Receives board_a in a0 and board_b in a1
+call clear_board 
 
 #load base addres of the test pattern string 
 la t0, test_pattern 
 
 li t1, 12 # t1 = total columns (12 per row)
 li t2, 1  # t2 = value representing a live cell - 1
-la a0, main_board # a1 = base address of main board
+
 
 #To decode - Think of string in 12 pairs of char, x (i), y (j), pairs
-
 while:
 lb t3, 0(t0)  # Load char for row (i) and check for null terminator
 beqz t3, done # Stop loop if hit null terminator = 0 (ASCII for null terminator)
@@ -258,42 +286,119 @@ lb t4, 1(t0) # Load char for column (j) from next byte position
 addi t3, t3, -48
 addi t4, t4, -48 
 
-#Calculate live cell position = base address + (i * column + j) * byte_size
+#Add 1 to account for border padding
+addi t3, t3, 1
+addi t4, t4, 1
+
+#Calculate live cell position (t5) = base address + (i * column + j) * byte_size
 mul t5, t3, t1   # t5 = i * columns  (rows to jump)
-add t5, t5, t1   # Add 12 to account for top/bottom border padding
 
 add t5, t5, t4   # t5 = t5 + j (elements to jump) 
-addi t5, t5, 1  # Add 1 to account for left/right border padding
 
 #Store live cell in calculated memory adress
-add t5, a0, t5   #Combine base address to  calculated memory address
+add t5, a0, t5   #Combine base address to  calculated memory address  
 sb t2, 0(t5)     #store 1 at position calculated
 
 addi t0, t0, 2 #Update pointer to next pair 
 j while
 
 done: 
+#Restire registers and Shrink stack
+lw ra, 12(sp)
+addi sp, sp, 16
 
 ret
 
 # ---------------------------------------------------------
-# create_colony
-# Clears the colony and repeatedly requests coordinates until
+# create_colony -
+# Clears the colony/board and repeatedly requests coordinates until
 # exactly twelve distinct valid living cells have been placed.
 #
 # Arguments: 
-#	none
+#	a0 (board_a) and a1 (board_b) from clear board
 #
 # Returns:
-#	a0
+#	a0 (board_a/current colony)
 #
 # Modifies:
 #
 #
 # ---------------------------------------------------------
 create_colony:
+addi sp, sp, -16
+sw ra, 12(sp)
 
+call clear_board #Clears boards - returns board_a in a0 and board_b in a1
+sw a0, 8(sp)
+sw a1, 4(sp)
 
+li t0, 12 #living cell limit
+li t1, 0 #living cell count
+
+request_coordinates:
+	bgt t1, t0, done_requests
+	
+	#"Cell x of 12"
+	la a0, cell 
+	li a7, 4
+	ecall
+	
+	add a0,zero, t1
+	li a7, 1
+	ecall
+	
+	la a0, of_12
+	li a7, 4
+	ecall
+	
+	#Prompt for row number
+	la a0, row_prompt
+	li a7, 4
+	ecall
+	#Retrieve row input
+	li a7, 5
+	ecall
+	#save row number
+	mv t2, a0 
+	
+	#Prompt for column number
+	la a0, column_prompt
+	li a7, 4
+	ecall
+	#Retrieve column input
+	li a7, 5
+	ecall
+	#save column number
+	mv t3, a0 	
+
+	li a0, 10 #newline
+	li a7, 11
+	ecall 
+	
+	mv a2, t2 #a2 holds row number
+	mv a3, t3 #a3 holds column number
+	lw a1, 4(sp) #restore address of board_b
+	call place_cell
+	
+	#ERROR - Try again if position occupied or row/column invalid
+	li t4, -1
+	beq a0, t4, request_coordinates
+	
+	#Only count as one of the 12 placed cells if placed successfully
+	addi t1, t1, 1
+	j request_coordinates
+       
+done_requests:
+#Restore value from stack
+lw a0, 8(sp)
+
+#Copy Cell's location from board_b to board_a
+mv t0, a1
+mv a1, a0
+mv a0, t0
+
+lw ra, 12(sp)
+addi sp, sp 16
 ret
 
 # ---------------------------------------------------------
@@ -301,19 +406,66 @@ ret
 # Validates a visible row and column and places one living byte
 # if the requested location is valid and currently empty.
 #
-# Arguments: 
+# Arguments:  a1 (board_b), a2 (row number), a3 (column number)
 #	
 #
-# Returns:
+# Returns: a1(modified_board), a0 (place cell status)
 #	
 #
-# Modifies:
+# Modifies: a0-a3, t0-t6
 #
 #
 # ---------------------------------------------------------
 place_cell:
+	li t0, 12 #column/row amount
+	li t2, 0 #lower range bound
+        li t3, 9 #upper range bound
+        li t4, 1 #Live cell Value
+        
+	#Check range for row
+	bgt a2, t3, invalid_coordinate
+	blt a2, t2, invalid_coordinate
+	
+        #Check range for column
+	bgt a3, t3, invalid_coordinate
+	blt a3, t2, invalid_coordinate
+	
+	#Calculate Position of Cell (t5) = base address + (i * column + j) * byte_size
+	
+        addi a2, a2, 1 #offset by 1 to skip border
+	addi a3, a3, 1 #offset by 1 to skip border
+	
+        mul t5, a2, t0   # t5 = i * columns  (rows to jump)
+        add t5, t5, a3   # t5 = t5 + j (elements to jump) 
+        add t5, t5, a1   #base address + (...)
+        
+        #Check address occupation status - If equal to 1 (occupied)
+        lb t6, 0(t5)
+        beq t6, t4, invalid_coordinate 
+        
+        #Place Live Cell in position
+        sb t4, 0(t5)
+done_placing_cell:
+        li a0, 0
+	ret
 
-ret
+#Coordinate for Row or Column Outside of range 0-9
+invalid_coordinate:
+       la a0, invalid_coordinate_msg
+       li a7, 4
+       ecall
+
+       li a0, -1 #flag error/invalid
+       ret
+
+occupied_position:
+       la a0, invalid_occupied_msg
+       li a7, 4
+       ecall
+       
+       li a0, -1 #flag error/invalid
+       ret
+       
 
 # ---------------------------------------------------------
 # run_simulation
@@ -359,7 +511,7 @@ ret
 # The invisible border makes all eight byte addresses valid.
 #
 # Arguments: 
-#	
+#	 
 #
 # Returns:
 #	
