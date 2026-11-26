@@ -231,6 +231,39 @@ ret
 display_board:
 	# I need to move the memory address into t0 so I can use a0 in environment calls
 	mv t0, a0
+	
+	# Generation header
+	la a0, generationNumber
+	li a7, 4
+	ecall
+	
+	# Generation value
+	mv a0, a1
+	li a7, 1
+	ecall
+	
+	# Newline
+	li a0, 0x0A
+	li a7, 11
+	ecall
+	
+	# Population header
+	la a0, currentPopulation
+	li a7, 4
+	ecall
+	
+	# Population value
+	mv a0, a2
+	li a7, 1
+	ecall
+	
+	# Newline and blank line
+	li a0, 0x0A
+	li a7, 11
+	ecall
+	ecall
+	
+	# Start of the traversal
 	# Using the formula (i * #columns + j) * type_size to locate the first usable cell
 	addi t0, t0, 13
 	li t3, 10 # Row counter
