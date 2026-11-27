@@ -502,8 +502,79 @@ ret
 #
 # ---------------------------------------------------------
 display_board:
+	# I need to move the memory address into t0 so I can use a0 in environment calls
+	mv t0, a0
+	
+	# Generation header
+	la a0, generationNumber
+	li a7, 4
+	ecall
+	
+	# Generation value
+	mv a0, a1
+	li a7, 1
+	ecall
+	
+	# Newline
+	li a0, 0x0A
+	li a7, 11
+	ecall
+	
+	# Population header
+	la a0, currentPopulation
+	li a7, 4
+	ecall
+	
+	# Population value
+	mv a0, a2
+	li a7, 1
+	ecall
+	
+	# Newline and blank line
+	li a0, 0x0A
+	li a7, 11
+	ecall
+	ecall
+	
+	# Start of the traversal
+	# Using the formula (i * #columns + j) * type_size to locate the first usable cell
+	addi t0, t0, 13
+	li t3, 10 # Row counter
+	
+row_loop:
+	li t2, 10 # Column counter
+	
+column_loop:
+	lbu t1, 0(t0) # Loads the cell's value
+	
+	beqz t1, print_dead_cell
+	
+	li a0, 0x23
+	li a7, 11
+	ecall
+	j next_cell
+	
+print_dead_cell:
+	li a0, 0x2E
+	li a7, 11
+	ecall
+	
+next_cell:
+	addi t0, t0, 1
+	addi t2, t2, -1
+	
+	bnez t2, column_loop
+	
+	li a0, 0x0A # newline char (moves to the next row)
+	li a7, 11
+	ecall
+	
+	addi t0, t0, 2 # I add 2 bytes to stay within the 10x10 array
+	addi t3, t3, -1
+	
+	bnez t3, row_loop
 
-ret
+	ret
 
 # ---------------------------------------------------------
 # count_neighbors
